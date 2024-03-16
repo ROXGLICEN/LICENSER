@@ -1,0 +1,136 @@
+import discord
+from discord.ext import commands
+from discord.ext.commands.converter import TextChannelConverter
+
+import requests
+from requests.auth import HTTPBasicAuth
+import base64
+
+# Intents
+intents = discord.Intents.all()
+intents.messages = True
+intents.guilds = True
+
+# Create an instance of the bot with intents
+bot = commands.Bot(command_prefix='!', intents=intents)
+
+@bot.event
+async def on_ready():
+    print(f'Logged in as {bot.user.name}')
+
+username = 'ROXGLICEN'
+token = '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'
+repo_owner = 'ROXGLICEN'
+repo_name = 'ROXGLICEN'
+filename = 'README.md'
+autorole = False
+# Set the API endpoint for the existing file in the repository
+api_url = f'https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{filename}'
+
+def get_raw_content(url):
+    try:
+        response = requests.get(url)
+        # Check if the request was successful (status code 200)
+        if response.status_code == 200:
+            return response.text
+        else:
+            print(f"Failed to fetch content. Status code: {response.status_code}")
+            print(response.text)  # Print the response text for additional information
+            return None
+    except requests.RequestException as e:
+        print(f"Error fetching content: {e}")
+        return None
+
+@bot.command(name="register")
+async def register(ctx, role: str, license: str):
+    required_role = discord.utils.get(ctx.guild.roles, name='BUYER')
+
+    if required_role is None or required_role not in ctx.author.roles:
+        await ctx.send("You don't have the required role to register.")
+        return
+
+    await ctx.send("Registering your license now. This may take up to 10 minutes.")
+    await ctx.author.remove_roles(required_role)
+     
+    if role.lower() == "pnb":
+        roleid = 1179315094140751912
+        autorole = True
+    elif role.lower() == "pabrik":
+        roleid = 1179315663232315392
+        autorole = True
+    elif role.lower() == "rotation":
+        roleid = 1180141895419187290
+        autorole = True
+    elif role.lower() == "harvest":
+        roleid = 1179315761232236594
+        autorole = True
+    elif role.lower() == "plant":
+        roleid = 1179315838843629670
+        autorole = True
+    elif role.lower() == "fishing":
+        roleid = 1185153894972674058
+        autorole = True
+    
+    if autorole == True:
+        roles = ctx.guild.get_role(roleid)
+        await ctx.author.add_roles(roles)    
+    # Example usage
+    github_raw_url = f"https://raw.githubusercontent.com/{repo_owner}/{repo_name}/main/{filename}"
+    content = get_raw_content(github_raw_url)
+
+    if content is not None:
+        print(content)
+
+        # Modify the content in Python
+        new_content = str(license)
+        content = content[:-1]
+        updated_content_bytes = (content[:-1] + ',"' + new_content + '"}').encode('utf-8')
+        updated_content_base64 = base64.b64encode(updated_content_bytes).decode('utf-8')
+
+        # Get the existing file information to retrieve the SHA value
+        file_info_response = requests.get(api_url, auth=HTTPBasicAuth(username, token))
+        existing_sha = file_info_response.json().get('sha', None)
+
+        if existing_sha is not None:
+            data = {
+                'message': 'Update README.md',
+                'content': updated_content_base64,
+                'sha': existing_sha,
+            }
+
+            # Make the PUT request to update the file in the repository
+            response = requests.put(api_url, auth=HTTPBasicAuth(username, token), json=data)
+
+            # Print the response from GitHub
+            print(response.json())
+        else:
+            print("Failed to retrieve SHA value.")
+    else:
+        print("Failed to fetch content. Check the GitHub URL and try again.")
+
+@bot.command(name='help')
+async def help_command(ctx):
+    # Your help text
+    help_text = "
+```ansi
+To register your license, use this format
+
+[0;34m!register <scripts> <license>
+
+Lists of scripts = {
+   FISHING
+   PABRIK
+   PNB
+   ROTATION
+   HARVEST
+   PLANT
+}
+```
+"
+
+    # Send the help text to the channel where the command was invoked
+    await ctx.send(help_text)
+
+
+# Run the bot with the token
+bot.run('MTE4NTEyOTA2MDg1MDk5MTExNg.GSTdZg.XfleHR5ZHUoLt07tFMoLIuOR1Vy3bNacIBpnNk')
